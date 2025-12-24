@@ -1,5 +1,2 @@
 dash==2.14.1
 plotly==5.17.0
-pandas==2.1.4
-numpy==1.26.2
-flask==3.0.0
