@@ -291,5 +291,8 @@ def update_dashboard(n):
     
     return fig1, fig2, f"{temp:.1f}°C", f"{vib:.1f} mm/s", f"{current_rpm:.0f} RPM", f"{current:.1f} A", status_panel, table
 
+# Export server for Vercel
+server = app.server
+
 if __name__ == '__main__':
-    app.run(debug=True, port=8050)
+    app.run_server(debug=True, port=8050)
