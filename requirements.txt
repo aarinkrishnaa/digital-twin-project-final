@@ -1,0 +1,11 @@
+numpy
+pandas
+matplotlib
+paho-mqtt
+scikit-learn
+streamlit
+flask
+plotly
+influxdb-client
+dash
+pyqtgraph

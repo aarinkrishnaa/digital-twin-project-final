@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Machine Model</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; background: #1a1a1a; font-family: Arial; }
+        canvas { display: block; border-radius: 8px; }
+        #info { 
+            position: absolute; 
+            top: 10px; 
+            right: 10px; 
+            padding: 15px;
+            font-size: 11px;
+            color: #ffffff;
+            background: rgba(45,45,45,0.9);
+            border-radius: 8px;
+            border: 1px solid #404040;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h4 style="margin: 0 0 10px 0; color: #3498db; font-size: 14px; letter-spacing: 1px;">MACHINE STATUS</h4>
+        <div id="status">Loading...</div>
+    </div>
+    
+    <script>
+        let scene, camera, renderer, machine, motor, motorShaft, controls;
+        let machineColor = 0x3498db;
+        
+        function createRealisticMachine() {
+            const machineGroup = new THREE.Group();
+            
+            // Industrial base platform
+            const baseGeometry = new THREE.BoxGeometry(4, 0.3, 3);
+            const baseMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x708090,
+                shininess: 20
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = -1.5;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            machineGroup.add(base);
+            
+            // Main machine housing
+            const housingGeometry = new THREE.BoxGeometry(2.5, 1.8, 2);
+            const housingMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x34495e,
+                shininess: 30
+            });
+            const housing = new THREE.Mesh(housingGeometry, housingMaterial);
+            housing.position.y = -0.4;
+            housing.castShadow = true;
+            machineGroup.add(housing);
+            
+            // Control panel
+            const panelGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.1);
+            const panelMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2c3e50,
+                shininess: 50
+            });
+            const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+            panel.position.set(-1.5, 0, 1.05);
+            panel.castShadow = true;
+            machineGroup.add(panel);
+            
+            // Panel screen
+            const screenGeometry = new THREE.BoxGeometry(0.6, 0.4, 0.02);
+            const screenMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x1a1a1a,
+                emissive: 0x003300
+            });
+            const screen = new THREE.Mesh(screenGeometry, screenMaterial);
+            screen.position.set(-1.5, 0.2, 1.06);
+            machineGroup.add(screen);
+            
+            // Support columns
+            for (let i = 0; i < 4; i++) {
+                const columnGeometry = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 12);
+                const columnMaterial = new THREE.MeshPhongMaterial({ color: 0x7f8c8d });
+                const column = new THREE.Mesh(columnGeometry, columnMaterial);
+                const x = i < 2 ? -1.8 : 1.8;
+                const z = i % 2 === 0 ? -0.8 : 0.8;
+                column.position.set(x, -0.75, z);
+                column.castShadow = true;
+                machineGroup.add(column);
+            }
+            
+            return machineGroup;
+        }
+        
+        function createIndustrialMotor() {
+            const motorGroup = new THREE.Group();
+            
+            // Motor housing with realistic proportions
+            const housingGeometry = new THREE.CylinderGeometry(0.45, 0.45, 1.2, 32);
+            const housingMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x8b4513,
+                shininess: 40,
+                specular: 0x111111
+            });
+            const housing = new THREE.Mesh(housingGeometry, housingMaterial);
+            housing.rotation.z = Math.PI / 2;
+            housing.castShadow = true;
+            motorGroup.add(housing);
+            
+            // Cooling fins with realistic spacing
+            for (let i = 0; i < 12; i++) {
+                const finGeometry = new THREE.BoxGeometry(0.08, 1.0, 0.15);
+                const finMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xa0522d,
+                    shininess: 20
+                });
+                const fin = new THREE.Mesh(finGeometry, finMaterial);
+                const angle = (i / 12) * Math.PI * 2;
+                fin.position.x = Math.cos(angle) * 0.48;
+                fin.position.z = Math.sin(angle) * 0.48;
+                fin.castShadow = true;
+                motorGroup.add(fin);
+            }
+            
+            // Front and rear end bells
+            const endBellGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.15, 32);
+            const endBellMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x7f8c8d,
+                shininess: 60
+            });
+            
+            const frontBell = new THREE.Mesh(endBellGeometry, endBellMaterial);
+            frontBell.position.x = 0.675;
+            frontBell.rotation.z = Math.PI / 2;
+            frontBell.castShadow = true;
+            motorGroup.add(frontBell);
+            
+            const rearBell = new THREE.Mesh(endBellGeometry, endBellMaterial);
+            rearBell.position.x = -0.675;
+            rearBell.rotation.z = Math.PI / 2;
+            rearBell.castShadow = true;
+            motorGroup.add(rearBell);
+            
+            // Motor shaft extending from front
+            const shaftGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.8, 16);
+            const shaftMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x95a5a6,
+                shininess: 100,
+                specular: 0x222222
+            });
+            motorShaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+            motorShaft.position.x = 1.075;
+            motorShaft.rotation.z = Math.PI / 2;
+            motorShaft.castShadow = true;
+            motorGroup.add(motorShaft);
+            
+            // Terminal box with realistic details
+            const terminalGeometry = new THREE.BoxGeometry(0.3, 0.2, 0.15);
+            const terminalMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x8b4513,
+                shininess: 30
+            });
+            const terminalBox = new THREE.Mesh(terminalGeometry, terminalMaterial);
+            terminalBox.position.set(-0.4, 0.35, 0);
+            terminalBox.castShadow = true;
+            motorGroup.add(terminalBox);
+            
+            // Terminal box cover
+            const coverGeometry = new THREE.BoxGeometry(0.32, 0.22, 0.05);
+            const coverMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xa0522d,
+                shininess: 40
+            });
+            const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+            cover.position.set(-0.4, 0.35, 0.1);
+            cover.castShadow = true;
+            motorGroup.add(cover);
+            
+            // Mounting feet
+            const footGeometry = new THREE.BoxGeometry(0.15, 0.8, 0.08);
+            const footMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xa0522d,
+                shininess: 20
+            });
+            
+            const topFoot = new THREE.Mesh(footGeometry, footMaterial);
+            topFoot.position.y = 0.6;
+            topFoot.castShadow = true;
+            motorGroup.add(topFoot);
+            
+            const bottomFoot = new THREE.Mesh(footGeometry, footMaterial);
+            bottomFoot.position.y = -0.6;
+            bottomFoot.castShadow = true;
+            motorGroup.add(bottomFoot);
+            
+            // Realistic cooling fan (more visible hub)
+            const fanHubGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.08, 16);
+            const fanHubMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2c3e50,
+                shininess: 50
+            });
+            const fanHub = new THREE.Mesh(fanHubGeometry, fanHubMaterial);
+            fanHub.position.x = -0.75;
+            fanHub.rotation.z = Math.PI / 2;
+            motorGroup.add(fanHub);
+            
+            // Fan blades with aerodynamic shape (more visible)
+            for (let i = 0; i < 8; i++) {
+                const bladeGroup = new THREE.Group();
+                
+                // Main blade (larger and more visible)
+                const bladeGeometry = new THREE.BoxGeometry(0.03, 0.4, 0.15);
+                const bladeMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xffd700,
+                    shininess: 60
+                });
+                const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+                blade.position.set(0, 0.2, 0);
+                blade.rotation.z = -0.4; // Blade angle for airflow
+                bladeGroup.add(blade);
+                
+                // Blade tip (more prominent)
+                const tipGeometry = new THREE.ConeGeometry(0.04, 0.08, 8);
+                const tip = new THREE.Mesh(tipGeometry, bladeMaterial);
+                tip.position.set(0, 0.4, 0);
+                tip.rotation.z = Math.PI / 2;
+                bladeGroup.add(tip);
+                
+                const angle = (i / 8) * Math.PI * 2;
+                bladeGroup.position.set(-0.75, Math.cos(angle) * 0.22, Math.sin(angle) * 0.22);
+                bladeGroup.rotation.x = angle;
+                
+                motorShaft.add(bladeGroup);
+            }
+            
+            // Nameplate
+            const nameplateGeometry = new THREE.BoxGeometry(0.4, 0.15, 0.02);
+            const nameplateMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xf8f9fa,
+                shininess: 10
+            });
+            const nameplate = new THREE.Mesh(nameplateGeometry, nameplateMaterial);
+            nameplate.position.set(0, -0.35, 0.48);
+            nameplate.castShadow = true;
+            motorGroup.add(nameplate);
+            
+            return motorGroup;
+        }
+        
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+            
+            // Enhanced lighting for realism
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(8, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            scene.add(directionalLight);
+            
+            // Additional fill light
+            const fillLight = new THREE.DirectionalLight(0x4a90e2, 0.3);
+            fillLight.position.set(-5, 5, -5);
+            scene.add(fillLight);
+            
+            // Orbit controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enableZoom = true;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5;
+            
+            // Create realistic machine
+            machine = createRealisticMachine();
+            scene.add(machine);
+            
+            // Create industrial motor
+            motor = createIndustrialMotor();
+            motor.position.set(1.8, 0.2, 0);
+            scene.add(motor);
+            
+            // Industrial floor
+            const floorGeometry = new THREE.PlaneGeometry(15, 15);
+            const floorMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x696969,
+                shininess: 10
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -2.5;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            camera.position.set(6, 4, 6);
+            camera.lookAt(0, 0, 0);
+            
+            animate();
+        }
+        
+        let rpm = 0;
+        let temperature = 0;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (controls) {
+                controls.update();
+            }
+            
+            // Realistic motor shaft rotation - only if motor is running
+            if (motorShaft && rpm > 0) {
+                motorShaft.rotation.x += (rpm / 300) * 0.1;
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        function updateStatus() {
+            // Read motor state from URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const motorRunning = urlParams.get('running') === 'true';
+            const targetRPM = parseInt(urlParams.get('rpm')) || 1500;
+            
+            updateMotorDisplay(motorRunning, targetRPM);
+        }
+        
+        function updateMotorDisplay(motorRunning, targetRPM) {
+            
+            if (motorRunning) {
+                rpm = targetRPM + (Math.random() - 0.5) * 100;
+                temperature = 65 + (rpm / 2000) * 20 + Math.random() * 10;
+                const vibration = 2 + (rpm / 2000) * 4 + Math.random();
+                const current = 8 + (rpm / 2000) * 7 + Math.random() * 2;
+                
+                document.getElementById('status').innerHTML = 
+                    `Temp: ${temperature.toFixed(1)}°C<br>
+                     Vibration: ${vibration.toFixed(2)} mm/s<br>
+                     RPM: ${rpm.toFixed(0)} ROTATING<br>
+                     Current: ${current.toFixed(1)}A<br>
+                     <small style="color: #b0b0b0;">Industrial Fan Motor</small>`;
+            } else {
+                rpm = 0;
+                temperature = 22;
+                const vibration = 0.0;
+                const current = 0.0;
+                
+                document.getElementById('status').innerHTML = 
+                    `Temp: ${temperature.toFixed(1)}°C<br>
+                     Vibration: ${vibration.toFixed(2)} mm/s<br>
+                     RPM: ${rpm.toFixed(0)} STOPPED<br>
+                     Current: ${current.toFixed(1)}A<br>
+                     <small style="color: #b0b0b0;">Industrial Fan Motor</small>`;
+            }
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        init();
+        updateStatus();
+        setInterval(updateStatus, 2000);
+    </script>
+</body>
+</html>

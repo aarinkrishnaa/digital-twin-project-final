@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Machine Model</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; background: #f0f2f5; font-family: Arial; }
+        canvas { display: block; border-radius: 8px; }
+        #info { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h4>🏭 Machine Status</h4>
+        <div id="status">Loading...</div>
+    </div>
+    
+    <script>
+        let scene, camera, renderer, machine, motor, motorShaft;
+        let machineColor = 0x3498db;
+        
+        function createRealisticMotor() {
+            const motorGroup = new THREE.Group();
+            
+            // Motor housing (main body)
+            const housingGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.8, 32);
+            const housingMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2c3e50,
+                shininess: 30
+            });
+            const housing = new THREE.Mesh(housingGeometry, housingMaterial);
+            housing.rotation.z = Math.PI / 2;
+            housing.castShadow = true;
+            motorGroup.add(housing);
+            
+            // Cooling fins
+            for (let i = 0; i < 8; i++) {
+                const finGeometry = new THREE.BoxGeometry(0.05, 0.8, 0.1);
+                const finMaterial = new THREE.MeshPhongMaterial({ color: 0x34495e });
+                const fin = new THREE.Mesh(finGeometry, finMaterial);
+                const angle = (i / 8) * Math.PI * 2;
+                fin.position.x = Math.cos(angle) * 0.42;
+                fin.position.z = Math.sin(angle) * 0.42;
+                fin.castShadow = true;
+                motorGroup.add(fin);
+            }
+            
+            // Motor shaft
+            const shaftGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.6, 16);
+            const shaftMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x95a5a6,
+                shininess: 100
+            });
+            motorShaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+            motorShaft.position.x = 0.75;
+            motorShaft.rotation.z = Math.PI / 2;
+            motorShaft.castShadow = true;
+            motorGroup.add(motorShaft);
+            
+            // Terminal box
+            const terminalGeometry = new THREE.BoxGeometry(0.2, 0.15, 0.1);
+            const terminalMaterial = new THREE.MeshPhongMaterial({ color: 0x2c3e50 });
+            const terminalBox = new THREE.Mesh(terminalGeometry, terminalMaterial);
+            terminalBox.position.set(-0.3, 0.3, 0);
+            terminalBox.castShadow = true;
+            motorGroup.add(terminalBox);
+            
+            return motorGroup;
+        }
+        
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f2f5);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 5, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            // Machine base
+            const baseGeometry = new THREE.BoxGeometry(3, 0.5, 2);
+            const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = -1;
+            base.receiveShadow = true;
+            scene.add(base);
+            
+            // Main machine body
+            const machineGeometry = new THREE.BoxGeometry(2, 1.5, 1.5);
+            const machineMaterial = new THREE.MeshLambertMaterial({ color: machineColor });
+            machine = new THREE.Mesh(machineGeometry, machineMaterial);
+            machine.castShadow = true;
+            scene.add(machine);
+            
+            // Create realistic industrial motor
+            motor = createRealisticMotor();
+            motor.position.set(1.2, 0, 0);
+            scene.add(motor);
+            
+            // Ground
+            const groundGeometry = new THREE.PlaneGeometry(10, 10);
+            const groundMaterial = new THREE.MeshLambertMaterial({ color: 0xecf0f1 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            
+            camera.position.set(4, 3, 4);
+            camera.lookAt(0, 0, 0);
+            
+            animate();
+        }
+        
+        let rpm = 0;
+        let temperature = 0;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate motor shaft based on RPM
+            if (motorShaft) {
+                motorShaft.rotation.x += (rpm / 1000) * 0.1;
+            }
+            
+            // Change machine color based on temperature
+            if (machine) {
+                if (temperature > 80) {
+                    machine.material.color.setHex(0xe74c3c); // Red for high temp
+                } else if (temperature > 70) {
+                    machine.material.color.setHex(0xf39c12); // Orange for medium temp
+                } else {
+                    machine.material.color.setHex(0x3498db); // Blue for normal temp
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        function updateStatus() {
+            // Simulate reading from parent dashboard data
+            // In real implementation, this would read from the CSV or API
+            fetch('../data/machine_live.csv')
+                .then(response => response.text())
+                .then(data => {
+                    const lines = data.trim().split('\n');
+                    if (lines.length > 0) {
+                        const lastLine = lines[lines.length - 1].split(',');
+                        temperature = parseFloat(lastLine[1]) || 0;
+                        const vibration = parseFloat(lastLine[2]) || 0;
+                        rpm = parseInt(lastLine[3]) || 0;
+                        const current = parseFloat(lastLine[4]) || 0;
+                        
+                        document.getElementById('status').innerHTML = 
+                            `Temp: ${temperature.toFixed(1)}°C<br>
+                             Vibration: ${vibration.toFixed(2)} mm/s<br>
+                             RPM: ${rpm}<br>
+                             Current: ${current.toFixed(1)}A`;
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('status').innerHTML = 'Offline';
+                });
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        init();
+        updateStatus();
+        setInterval(updateStatus, 2000);
+    </script>
+</body>
+</html>
